@@ -1,4 +1,5 @@
 import globals from "./globals";
+import listeners from "./eventlisteners";
 
 export default class utils {
     static addDomCells(number) {
@@ -98,21 +99,340 @@ export default class utils {
         container.appendChild(BUTTON);
     }
 
+    static checkCellOpp(cell) {
+        const OPPBOARD = globals.getOpponent().board;
+        const CELLS = Array.prototype.slice.call(
+            document.querySelectorAll(".oppcell")
+        );
+        const INDEX = CELLS.indexOf(cell);
+        const LENGTH = OPPBOARD.length;
+
+        if (OPPBOARD[Math.floor(INDEX / LENGTH)][INDEX % LENGTH] === 1) {
+            return true;
+        }
+        return false;
+    }
+
+    static checkCellPlayer(cell) {
+        const PBOARD = globals.getPlayer().board;
+        const CELLS = Array.prototype.slice.call(
+            document.querySelectorAll(".cell")
+        );
+        const INDEX = CELLS.indexOf(cell);
+        const LENGTH = PBOARD.length;
+
+        if (PBOARD[Math.floor(INDEX / LENGTH)][INDEX % LENGTH] === 1) {
+            return true;
+        }
+        return false;
+    }
+
+    static shuffle(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+    }
+
+    static sleep(ms) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
+    static getComputerMove() {
+        const BOARD = globals.getOpponent().unmappedBoard;
+        const mappedCells = BOARD.flat().filter((x) => x !== null).length;
+
+        if (mappedCells === 0) {
+            // handle special case where no cells have been mapped yet
+            const size = BOARD.length;
+            const x = Math.floor(Math.random() * size);
+            const y = Math.floor(Math.random() * size);
+            let target = { x: x, y: y };
+            return target;
+        }
+
+        // find all unmapped cells adjacent to hits
+        let potentialMoves = [];
+        BOARD.forEach((row, rowIndex) => {
+            row.forEach((cell, colIndex) => {
+                if (cell === null) {
+                    // check if adjacent to hit cell
+                    let adjacentHit = false;
+                    if (rowIndex > 0 && BOARD[rowIndex - 1][colIndex] === 1) {
+                        adjacentHit = true;
+                    }
+                    if (colIndex > 0 && BOARD[rowIndex][colIndex - 1] === 1) {
+                        adjacentHit = true;
+                    }
+                    if (
+                        rowIndex < BOARD.length - 1 &&
+                        BOARD[rowIndex + 1][colIndex] === 1
+                    ) {
+                        adjacentHit = true;
+                    }
+                    if (
+                        colIndex < row.length - 1 &&
+                        BOARD[rowIndex][colIndex + 1] === 1
+                    ) {
+                        adjacentHit = true;
+                    }
+                    if (adjacentHit) {
+                        potentialMoves.push({ x: colIndex, y: rowIndex });
+                    }
+                }
+            });
+        });
+
+        // if no adjacent hits, choose randomly from unmapped cells
+        if (potentialMoves.length === 0) {
+            potentialMoves = [];
+            BOARD.forEach((row, rowIndex) => {
+                row.forEach((cell, colIndex) => {
+                    if (cell === null) {
+                        potentialMoves.push({ x: colIndex, y: rowIndex });
+                    }
+                });
+            });
+        }
+
+        potentialMoves = utils.shuffle(potentialMoves);
+
+        // iterate through potential moves and select the first one that hasn't been tried yet
+        let target = null;
+        potentialMoves.forEach((move) => {
+            if (BOARD[move.y][move.x] === null) {
+                target = move;
+                return;
+            }
+        });
+
+        return target;
+    }
+
+    static loadInteractableEnemyBoard() {
+        const OPPBOARD = document.querySelector("#opponentboard");
+        const CONTAINER = OPPBOARD.parentElement;
+        const UNMAPPED = globals.getPlayer().unmappedBoard;
+
+        CONTAINER.removeChild(OPPBOARD);
+
+        const NEWBOARD = document.createElement("div");
+        NEWBOARD.id = "opponentboard";
+        for (let i = 0; i < UNMAPPED.length; i++) {
+            for (let j = 0; j < UNMAPPED[0].length; j++) {
+                const CELL = document.createElement("div");
+                CELL.classList.add("oppcell");
+                CELL.addEventListener("click", () => {
+                    utils.handleCellClick(CELL);
+                });
+                if (UNMAPPED[i][j] === 1) {
+                    CELL.style.backgroundColor = "red";
+                } else if (UNMAPPED[i][j] === 0) {
+                    CELL.style.backgroundColor = "gray";
+                }
+                NEWBOARD.appendChild(CELL);
+            }
+        }
+        CONTAINER.appendChild(NEWBOARD);
+    }
+
+    static loadUninteractableEnemyBoard() {
+        const OPPBOARD = document.querySelector("#opponentboard");
+        const CONTAINER = OPPBOARD.parentElement;
+        const UNMAPPED = globals.getPlayer().unmappedBoard;
+
+        CONTAINER.removeChild(OPPBOARD);
+
+        const NEWBOARD = document.createElement("div");
+        NEWBOARD.id = "opponentboard";
+        for (let i = 0; i < UNMAPPED.length; i++) {
+            for (let j = 0; j < UNMAPPED[0].length; j++) {
+                const CELL = document.createElement("div");
+                CELL.classList.add("uninteractablecell");
+                if (UNMAPPED[i][j] === 1) {
+                    CELL.style.backgroundColor = "red";
+                } else if (UNMAPPED[i][j] === 0) {
+                    CELL.style.backgroundColor = "gray";
+                }
+                NEWBOARD.appendChild(CELL);
+            }
+        }
+        CONTAINER.appendChild(NEWBOARD);
+    }
+
+    static reloadPlayerBoard() {
+        const PBOARD = globals.getPlayer().board;
+        const UNMAPPEDBOARD = globals.getOpponent().unmappedBoard;
+
+        const OLDBOARD = document.querySelector("#playerboard");
+        const CONTAINER = OLDBOARD.parentElement;
+
+        CONTAINER.removeChild(OLDBOARD);
+
+        const NEWBOARD = document.createElement("div");
+        NEWBOARD.id = "playerboard";
+
+        for (let i = 0; i < PBOARD.length; i++) {
+            for (let j = 0; j < PBOARD[0].length; j++) {
+                const CELL = document.createElement("div");
+                CELL.classList.add("cell");
+                if (UNMAPPEDBOARD[i][j] === 1) {
+                    CELL.style.backgroundColor = "red";
+                } else if (UNMAPPEDBOARD[i][j] === 0) {
+                    CELL.style.backgroundColor = "gray";
+                } else if (PBOARD[i][j] === 1 && UNMAPPEDBOARD[i][j] === null) {
+                    CELL.style.backgroundColor = "black";
+                }
+                NEWBOARD.appendChild(CELL);
+            }
+        }
+        CONTAINER.appendChild(NEWBOARD);
+    }
+
+    static removeAllChildren(parent) {
+        while (parent.firstChild) {
+            parent.firstChild.remove();
+        }
+    }
+
+    static handleReset() {
+        const BODY = document.querySelector("body");
+        utils.removeAllChildren(BODY);
+
+        const SETUP = document.createElement("div");
+        const BTN = document.createElement("button");
+        const CONTAINER = document.createElement("div");
+        SETUP.id = "setup";
+        CONTAINER.id = "container";
+        BTN.id = "axisbtn";
+        BTN.textContent = "CHANGE AXIS";
+
+        BODY.appendChild(SETUP);
+        SETUP.append(BTN, CONTAINER);
+
+        utils.addDomCells(100);
+        globals.newGame();
+        listeners.addShipPositionListeners();
+    }
+
+    static loadGameOver(winner) {
+        const BODY = document.querySelector("body");
+        const BOARDS = document.querySelector("#boards");
+        BODY.removeChild(BOARDS);
+        const DIV = document.createElement("div");
+        DIV.id = "reset";
+        const BUTTON = document.createElement("button");
+        const H1 = document.createElement("h1");
+        BUTTON.textContent = "Play Again";
+        BUTTON.id = "resetbtn";
+        if (winner === "player") {
+            H1.textContent = "You win!";
+        } else {
+            H1.textContent = "You lose.";
+        }
+        BODY.appendChild(DIV);
+        DIV.append(H1, BUTTON);
+        BUTTON.addEventListener("click", utils.handleReset);
+    }
+
+    static handleCellClick(cell) {
+        (async () => {
+            if (utils.checkCellOpp(cell)) {
+                // Check if opponent has any lives left
+                if (globals.getOpponent().getLives() === 0) {
+                    utils.loadGameOver("player");
+                }
+            }
+            // Update players unmapped board to include the hit or miss
+            // Remove dom elements so player can't click on cells
+            const OPPCELLS = Array.prototype.slice.call(
+                document.querySelectorAll(".oppcell")
+            );
+            const TURNTEXT = document.querySelector("#turntext");
+            globals.getPlayer().mapTarget(
+                {
+                    x: OPPCELLS.indexOf(cell) % 10,
+                    y: Math.floor(OPPCELLS.indexOf(cell) / 10),
+                },
+                globals.getOpponent()
+            );
+
+            utils.loadUninteractableEnemyBoard();
+
+            TURNTEXT.textContent = "Opponents turn";
+            const OPPTURN = utils.getComputerMove();
+            globals.getOpponent().mapTarget(OPPTURN, globals.getPlayer());
+            //await utils.sleep(500);
+            utils.reloadPlayerBoard();
+            if (globals.getPlayer().getLives() === 0) {
+                utils.loadGameOver("enemy");
+            }
+            //await utils.sleep(500);
+            TURNTEXT.textContent = "Your turn";
+            //await utils.sleep(500);
+            utils.loadInteractableEnemyBoard();
+            console.log("Player: " + globals.getPlayer().getLives());
+            console.log("Enemy " + globals.getOpponent().getLives());
+            // Update turn text to opponent
+            // Get opponents turn
+            // When done rerender opponent board to be clickable
+            // Set text back to player turn
+
+            // First remove event listeners from all cells by removing from the DOM
+            // Add it back but without event listeners
+            // Check if cell is a hit or miss, subtract from opponent board lives
+            // Check if opponent lives is 0, if so game over and player wins
+            // If not then get opponents turn set text to "Opponents turn"
+            // Set timeout for 1 second then call opponentTurn()
+            // Check if opponent hit or miss, subtract from player board lives
+            // Check if player lives is 0, if so game over and opponent wins
+            // If not then get players turn set text to "Your turn"
+            // Rerender opponent board and add event listeners to all cells
+
+            // Let player go first
+            // When player clicks on a cell check if hit or miss etc update blank board
+            // Now it's opponents turn, rerender opponents board so player can't click again
+            // Wait for opponent to click once that's done rerender player board with
+            // eventlisteners
+            // (You want to remove them when its opponents turn so player can't click anything)
+            // Have player and opponent function check if have 17 x's on board
+            // Count all x's on a board and if 17 then game over
+
+            // Check if hit
+            // Check if all ships destroyed
+            // Get opponents turn
+            // Figure out how to loop back to players turn
+
+            // make 2 more blank boards
+            // For player turn set same coordinates on blank board then compare them to the real board
+            // The opponent will use the same logic
+            // If hit set blank to 1 else 0
+            // Opponent uses that board to calculate next move
+
+            // For turns if its player turn have text say "Your turn" else "Opponents turn"
+        })();
+    }
+
     static loadGameBoards() {
         utils.randomizeOpponentBoard();
         const BODY = document.querySelector("body");
         const DIV = document.createElement("div");
+        const BOARDSCONTAINER = document.createElement("div");
         const EMPTYDIV1 = document.createElement("div");
         const EMPTYDIV2 = document.createElement("div");
         const HEADING1 = document.createElement("h1");
         const HEADING2 = document.createElement("h1");
+        const TURNTEXT = document.createElement("h1");
         const PLAYERDIV = document.createElement("div");
         const OPPONENTDIV = document.createElement("div");
         DIV.setAttribute("id", "boards");
         PLAYERDIV.setAttribute("id", "playerboard");
         OPPONENTDIV.setAttribute("id", "opponentboard");
+        TURNTEXT.setAttribute("id", "turntext");
         HEADING1.textContent = "YOU";
         HEADING2.textContent = "ENEMY";
+        TURNTEXT.textContent = "YOUR TURN";
         const PBoard = globals.getPlayer().board;
         const OBoard = globals.getOpponent().board;
         // Player Board
@@ -130,15 +450,19 @@ export default class utils {
         for (let i = 0; i < OBoard.length; i++) {
             for (let j = 0; j < OBoard[0].length; j++) {
                 const CELL = document.createElement("div");
-                CELL.classList.add("cell");
-                OBoard[i][j] === 0
-                    ? (CELL.style.backgroundColor = "white")
-                    : (CELL.style.backgroundColor = "black");
+                CELL.classList.add("oppcell");
+                OBoard[i][j] === 1
+                    ? (CELL.dataset.hit = "true")
+                    : (CELL.dataset.hit = "false");
+                CELL.addEventListener("click", () => {
+                    utils.handleCellClick(CELL);
+                });
                 OPPONENTDIV.appendChild(CELL);
             }
         }
         BODY.appendChild(DIV);
-        DIV.append(EMPTYDIV1, EMPTYDIV2);
+        DIV.append(TURNTEXT, BOARDSCONTAINER);
+        BOARDSCONTAINER.append(EMPTYDIV1, EMPTYDIV2);
         EMPTYDIV1.append(HEADING1, PLAYERDIV);
         EMPTYDIV2.append(HEADING2, OPPONENTDIV);
     }

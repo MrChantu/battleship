@@ -5,7 +5,8 @@ export default class globals {
     static opponent = new game();
 
     static newGame() {
-        globals.battleship = new game();
+        globals.player = new game();
+        globals.opponent = new game();
     }
 
     static getPlayer() {
