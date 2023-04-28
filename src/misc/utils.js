@@ -10,6 +10,7 @@ export default class utils {
             CONTAINER.appendChild(CELL);
         }
     }
+
     static findCell(cell) {
         const CELLS = document.querySelectorAll(".cell");
         const CELLSARRAY = [];
@@ -50,7 +51,11 @@ export default class utils {
         const usedPositions = [];
 
         for (let i = 0; i < SHIPS.length; i++) {
-            let row, col, math, pos, isValid;
+            let row;
+            let col;
+            let math;
+            let pos;
+            let isValid;
             while (!isValid) {
                 row = Math.floor(Math.random() * 10);
                 col = Math.floor(Math.random() * 10);
@@ -71,10 +76,8 @@ export default class utils {
                         if (row + j < 10) {
                             BOARD[row + j][col] = 1;
                         }
-                    } else {
-                        if (col + j < 10) {
-                            BOARD[row][col + j] = 1;
-                        }
+                    } else if (col + j < 10) {
+                        BOARD[row][col + j] = 1;
                     }
                 }
             } else {
@@ -83,10 +86,8 @@ export default class utils {
                         if (row - j >= 0) {
                             BOARD[row - j][col] = 1;
                         }
-                    } else {
-                        if (col - j >= 0) {
-                            BOARD[row][col - j] = 1;
-                        }
+                    } else if (col - j >= 0) {
+                        BOARD[row][col - j] = 1;
                     }
                 }
             }
@@ -148,7 +149,7 @@ export default class utils {
             const size = BOARD.length;
             const x = Math.floor(Math.random() * size);
             const y = Math.floor(Math.random() * size);
-            let target = { x: x, y: y };
+            const target = { x, y };
             return target;
         }
 
@@ -203,7 +204,6 @@ export default class utils {
         potentialMoves.forEach((move) => {
             if (BOARD[move.y][move.x] === null) {
                 target = move;
-                return;
             }
         });
 
@@ -223,13 +223,15 @@ export default class utils {
             for (let j = 0; j < UNMAPPED[0].length; j++) {
                 const CELL = document.createElement("div");
                 CELL.classList.add("oppcell");
-                CELL.addEventListener("click", () => {
-                    utils.handleCellClick(CELL);
-                });
                 if (UNMAPPED[i][j] === 1) {
                     CELL.style.backgroundColor = "red";
                 } else if (UNMAPPED[i][j] === 0) {
                     CELL.style.backgroundColor = "gray";
+                }
+                if (UNMAPPED[i][j] !== 0 && UNMAPPED[i][j] !== 1) {
+                    CELL.addEventListener("click", () => {
+                        utils.handleCellClick(CELL);
+                    });
                 }
                 NEWBOARD.appendChild(CELL);
             }
@@ -338,14 +340,6 @@ export default class utils {
 
     static handleCellClick(cell) {
         (async () => {
-            if (utils.checkCellOpp(cell)) {
-                // Check if opponent has any lives left
-                if (globals.getOpponent().getLives() === 0) {
-                    utils.loadGameOver("player");
-                }
-            }
-            // Update players unmapped board to include the hit or miss
-            // Remove dom elements so player can't click on cells
             const OPPCELLS = Array.prototype.slice.call(
                 document.querySelectorAll(".oppcell")
             );
@@ -358,59 +352,25 @@ export default class utils {
                 globals.getOpponent()
             );
 
+            if (globals.getOpponent().getLives() === 0) {
+                utils.loadGameOver("player");
+                console.log("You win!");
+            }
+
             utils.loadUninteractableEnemyBoard();
 
             TURNTEXT.textContent = "Opponents turn";
             const OPPTURN = utils.getComputerMove();
             globals.getOpponent().mapTarget(OPPTURN, globals.getPlayer());
-            //await utils.sleep(500);
+            await utils.sleep(500);
             utils.reloadPlayerBoard();
             if (globals.getPlayer().getLives() === 0) {
                 utils.loadGameOver("enemy");
             }
-            //await utils.sleep(500);
+            await utils.sleep(500);
             TURNTEXT.textContent = "Your turn";
-            //await utils.sleep(500);
+            await utils.sleep(500);
             utils.loadInteractableEnemyBoard();
-            console.log("Player: " + globals.getPlayer().getLives());
-            console.log("Enemy " + globals.getOpponent().getLives());
-            // Update turn text to opponent
-            // Get opponents turn
-            // When done rerender opponent board to be clickable
-            // Set text back to player turn
-
-            // First remove event listeners from all cells by removing from the DOM
-            // Add it back but without event listeners
-            // Check if cell is a hit or miss, subtract from opponent board lives
-            // Check if opponent lives is 0, if so game over and player wins
-            // If not then get opponents turn set text to "Opponents turn"
-            // Set timeout for 1 second then call opponentTurn()
-            // Check if opponent hit or miss, subtract from player board lives
-            // Check if player lives is 0, if so game over and opponent wins
-            // If not then get players turn set text to "Your turn"
-            // Rerender opponent board and add event listeners to all cells
-
-            // Let player go first
-            // When player clicks on a cell check if hit or miss etc update blank board
-            // Now it's opponents turn, rerender opponents board so player can't click again
-            // Wait for opponent to click once that's done rerender player board with
-            // eventlisteners
-            // (You want to remove them when its opponents turn so player can't click anything)
-            // Have player and opponent function check if have 17 x's on board
-            // Count all x's on a board and if 17 then game over
-
-            // Check if hit
-            // Check if all ships destroyed
-            // Get opponents turn
-            // Figure out how to loop back to players turn
-
-            // make 2 more blank boards
-            // For player turn set same coordinates on blank board then compare them to the real board
-            // The opponent will use the same logic
-            // If hit set blank to 1 else 0
-            // Opponent uses that board to calculate next move
-
-            // For turns if its player turn have text say "Your turn" else "Opponents turn"
         })();
     }
 
@@ -440,9 +400,7 @@ export default class utils {
             for (let j = 0; j < PBoard[0].length; j++) {
                 const CELL = document.createElement("div");
                 CELL.classList.add("cell");
-                PBoard[i][j] === 0
-                    ? (CELL.style.backgroundColor = "white")
-                    : (CELL.style.backgroundColor = "black");
+                if (PBoard[i][j] === 1) CELL.style.backgroundColor = "black";
                 PLAYERDIV.appendChild(CELL);
             }
         }
